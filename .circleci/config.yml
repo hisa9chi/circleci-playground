@@ -10,9 +10,9 @@ jobs:
     resource_class: small
     steps:
       - checkout
-      - command: echo "Helllo World"
+      - run: echo "Helllo World"
 
 workflows:
-  test:
+  sample:
     jobs:
       - test
