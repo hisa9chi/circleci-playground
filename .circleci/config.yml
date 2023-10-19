@@ -1,18 +1,111 @@
 version: 2.1
 
-orbs:
-  aws-cli: circleci/aws-cli@3.2.0
+executors:
+  remote_docker_defaults:
+    docker:
+      - image: 'docker:17.06-git'
+
+commands:
+  basic_docker_build:
+    steps:
+      - run:
+          name: "Build a really basic docker image"
+          command: |
+            dockerfile=Dockerfile
+            echo "FROM alpine:latest" > $dockerfile
+            echo "RUN echo hello" >> $dockerfile
+            docker build -f $dockerfile --tag throwaway:$CIRCLE_BUILD_NUM .
+            docker run --rm throwaway:$CIRCLE_BUILD_NUM
+
+  golang_docker_build:
+    steps:
+      - run:
+          name: "Build a really golang docker image"
+          command: |
+            dockerfile=Dockerfile
+            echo "FROM golang:1.11-alpine" > $dockerfile
+            echo "RUN echo hello" >> $dockerfile
+            docker build -f $dockerfile --tag throwaway:$CIRCLE_BUILD_NUM .
+            docker run --rm throwaway:$CIRCLE_BUILD_NUM
+
+  basic_docker_buildx_build:
+    steps:
+      - run:
+          name: Setup docker buildx
+          command: |
+            docker context create circleci
+            docker buildx create --use circleci
+            docker buildx ls
+            docker context inspect circleci          
+      - run:
+          name: "Build a really basic docker image"
+          command: |
+            dockerfile=Dockerfile
+            echo "FROM alpine:latest" > $dockerfile
+            echo "RUN echo hello" >> $dockerfile
+            docker buildx build -f $dockerfile --output=type=docker --tag throwaway:$CIRCLE_BUILD_NUM .
+            docker run --rm throwaway:$CIRCLE_BUILD_NUM
 
 jobs:
-  test:
-    docker:
-      - image: cimg/base:current
-    resource_class: small
+  machine:
+    machine: true
     steps:
-      - checkout
-      - run: echo "Helllo World"
+      - run: which docker
+      - run: docker -v
+      - basic_docker_build
+      - run: docker version
+
+  machine_buildkit:
+    machine: true
+    environment:
+      DOCKER_BUILDKIT: 1
+    steps:
+      - run: which docker
+      - run: docker -v
+      - basic_docker_build
+      - run: docker version
+
+  machine_buildx_buildkit:
+    machine: true
+    environment:
+      DOCKER_BUILDKIT: 1
+    steps:
+      - run: which docker
+      - run: docker -v
+      - basic_docker_buildx_build
+      - run: docker version
+
+  docker:
+    executor:
+      name: remote_docker_defaults
+    environment:
+      DOCKER_BUILDKIT: 1
+    steps:
+      - run: which docker
+      - run: docker -v
+      - setup_remote_docker
+      - basic_docker_build
+      - run: docker version
+
+  docker_layercache:
+    executor:
+      name: remote_docker_defaults
+    environment:
+      DOCKER_BUILDKIT: 1
+    steps:
+      - run: which docker
+      - run: docker -v
+      - setup_remote_docker:
+          docker_layer_caching: true
+      - basic_docker_build
+      - run: docker version
 
 workflows:
-  sample:
+  version: 2.1
+  docker_build_jobs:
     jobs:
-      - test
+      - machine
+      - machine_buildkit
+      - machine_buildx_buildkit
+      - docker
+      - docker_layercache
