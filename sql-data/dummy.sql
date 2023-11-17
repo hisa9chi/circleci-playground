@@ -1,5 +1,3 @@
-ALTER USER 'root'@'localhost' IDENTIFIED BY 'passw0rd';
-
 DROP TABLE IF EXISTS `Persons`;
 
 CREATE TABLE Persons (
